@@ -1,6 +1,5 @@
 import { Clock } from "lucide-react"
 import type { Transaction } from "@/lib/api"
-import { cn } from "@/lib/utils"
 
 interface TransactionListProps {
   transactions: Transaction[]
@@ -16,12 +15,16 @@ export function TransactionList({ transactions }: TransactionListProps) {
         const transactionDate = transaction.TransactionDate || transaction.date
         const transactionAmount = transaction.Amount || transaction.amount
         const transactionCurrency = transaction.Currency || 'EUR'
-        const description = transaction.Description || transaction.description || 
-                          `${transactionType === 'deposit' ? 'Deposit' : 'Withdrawal'} - ${transaction.UsageAccountId || transaction.accountId}`
+        const usageAccountId = transaction.UsageAccountId || transaction.accountId
+        const payerAccountId = transaction.PayerAccountId || transaction.payerId
+        
+        // Format title: "Withdrawal on {UsageAccountId}" or "Deposit on {UsageAccountId}"
+        const title = `${transactionType === 'deposit' ? 'Deposit' : 'Withdrawal'} on ${usageAccountId}`
+        
         const category = transaction.InvoiceId || transaction.category
         
         // Format date
-        const dateObj = new Date(transactionDate)
+        const dateObj = transactionDate ? new Date(transactionDate) : new Date()
         const dateStr = dateObj.toLocaleDateString()
         const timeStr = dateObj.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
         
@@ -30,7 +33,7 @@ export function TransactionList({ transactions }: TransactionListProps) {
             key={transactionId}
             className="flex items-center justify-between border-l-4 py-3 px-4 rounded-r-lg transition-colors hover:bg-muted/50"
             style={{
-              borderColor: transactionType === "deposit" ? "hsl(var(--success))" : "hsl(var(--destructive))",
+              borderColor: transactionType === "deposit" ? "#3D97AD" : "#EC9400",
             }}
           >
             <div className="flex items-center gap-4">
@@ -40,24 +43,21 @@ export function TransactionList({ transactions }: TransactionListProps) {
               </div>
 
               <div className="flex flex-col">
-                <span className="font-medium text-sm">{description}</span>
-                {category && <span className="text-xs text-muted-foreground">Invoice: {category}</span>}
-                <span className="text-xs text-muted-foreground">
-                  Account: {transaction.UsageAccountId || transaction.accountId}
-                </span>
+                <span className="font-medium text-sm">{title}</span>
+                <span className="text-xs text-muted-foreground">{payerAccountId}</span>
               </div>
             </div>
 
             <div className="flex items-center gap-3">
               <Clock className="h-4 w-4 text-muted-foreground" />
               <span
-                className={cn(
-                  "font-semibold text-sm",
-                  transactionType === "deposit" ? "text-success" : "text-destructive",
-                )}
+                className="font-semibold text-sm"
+                style={{
+                  color: transactionType === "deposit" ? "#3D97AD" : "#EC9400"
+                }}
               >
                 {transactionType === "deposit" ? "+" : "-"}
-                {Math.abs(transactionAmount).toFixed(2)} {transactionCurrency}
+                {Math.abs(transactionAmount || 0).toFixed(2)} {transactionCurrency}
               </span>
             </div>
           </div>

@@ -31,7 +31,7 @@ export default function HomePage() {
         <div className="grid gap-6 md:grid-cols-2">
           <Card>
             <CardHeader>
-              <CardTitle className="text-lg">Usage by Account</CardTitle>
+              <CardTitle className="text-lg">Usage by Account (Top 10)</CardTitle>
             </CardHeader>
             <CardContent>
               <UsageChart />

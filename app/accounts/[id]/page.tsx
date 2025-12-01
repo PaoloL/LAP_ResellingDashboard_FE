@@ -29,17 +29,16 @@ export default function AccountDetailsPage({ params, searchParams }: AccountDeta
   // Determine account type from URL parameter
   const isPayer = type === 'payer'
   
-  // Fetch appropriate account data
+  // ALWAYS call all hooks unconditionally to follow Rules of Hooks
   const { data: payerAccount, loading: payerLoading, error: payerError } = usePayerAccount(isPayer ? id : '')
   const { data: usageAccount, loading: usageLoading, error: usageError } = useUsageAccount(!isPayer ? id : '')
-  
-  // Fetch transactions based on account type
   const { data: payerTransactions, loading: payerTxLoading, error: payerTxError } = usePayerTransactions(isPayer ? id : '')
   const { data: usageTransactions, loading: usageTxLoading, error: usageTxError } = useAccountTransactions(
     !isPayer && usageAccount?.PayerAccountId ? usageAccount.PayerAccountId : '',
     !isPayer ? id : ''
   )
   
+  // Derive values from hooks
   const account = isPayer ? payerAccount : usageAccount
   const transactions = isPayer ? payerTransactions : usageTransactions
   const accountLoading = isPayer ? payerLoading : usageLoading
@@ -47,6 +46,34 @@ export default function AccountDetailsPage({ params, searchParams }: AccountDeta
   const transactionsLoading = isPayer ? payerTxLoading : usageTxLoading
   const transactionsError = isPayer ? payerTxError : usageTxError
 
+  // Calculate deposit and withdrawal totals - MUST be called before any early returns
+  const { totalDeposits, totalWithdrawals, costPercentage, isOverBudget } = useMemo(() => {
+    if (!transactions || transactions.length === 0) {
+      return { totalDeposits: 0, totalWithdrawals: 0, costPercentage: 0, isOverBudget: false }
+    }
+
+    const deposits = transactions
+      .filter(t => (t.TransactionType || t.type)?.toUpperCase() === 'DEPOSIT')
+      .reduce((sum, t) => sum + (t.Amount || t.amount || 0), 0)
+
+    const withdrawals = transactions
+      .filter(t => (t.TransactionType || t.type)?.toUpperCase() === 'WITHDRAWAL')
+      .reduce((sum, t) => sum + (t.Amount || t.amount || 0), 0)
+
+    // Calculate cost percentage: withdrawals as percentage of deposits
+    // If withdrawals > deposits, cap at 100% and mark as over budget
+    const costPercent = deposits > 0 ? (withdrawals / deposits) * 100 : 0
+    const overBudget = withdrawals > deposits
+
+    return {
+      totalDeposits: deposits,
+      totalWithdrawals: withdrawals,
+      costPercentage: Math.min(costPercent, 100),
+      isOverBudget: overBudget
+    }
+  }, [transactions])
+
+  // Early returns AFTER all hooks have been called
   if (accountLoading) {
     return (
       <div className="min-h-screen">
@@ -92,32 +119,6 @@ export default function AccountDetailsPage({ params, searchParams }: AccountDeta
   const createdAt = account.CreatedAt || account.createdAt
   const updatedAt = account.UpdatedAt || account.updatedAt
 
-  // Calculate deposit and withdrawal totals
-  const { totalDeposits, totalWithdrawals, depositPercentage, withdrawalPercentage } = useMemo(() => {
-    if (!transactions || transactions.length === 0) {
-      return { totalDeposits: 0, totalWithdrawals: 0, depositPercentage: 0, withdrawalPercentage: 0 }
-    }
-
-    const deposits = transactions
-      .filter(t => (t.TransactionType || t.type)?.toUpperCase() === 'DEPOSIT')
-      .reduce((sum, t) => sum + (t.Amount || t.amount || 0), 0)
-
-    const withdrawals = transactions
-      .filter(t => (t.TransactionType || t.type)?.toUpperCase() === 'WITHDRAWAL')
-      .reduce((sum, t) => sum + (t.Amount || t.amount || 0), 0)
-
-    const total = deposits + withdrawals
-    const depPercent = total > 0 ? (deposits / total) * 100 : 0
-    const withPercent = total > 0 ? (withdrawals / total) * 100 : 0
-
-    return {
-      totalDeposits: deposits,
-      totalWithdrawals: withdrawals,
-      depositPercentage: depPercent,
-      withdrawalPercentage: withPercent
-    }
-  }, [transactions])
-
   return (
     <div className="min-h-screen">
       <Header title={`${accountName}`} />
@@ -136,7 +137,11 @@ export default function AccountDetailsPage({ params, searchParams }: AccountDeta
               <Users className="h-6 w-6 text-primary" />
             )}
             <h2 className="text-2xl font-semibold">{accountName}</h2>
-            <Badge variant="secondary">{isPayer ? 'PAYER' : 'USAGE'}</Badge>
+            <Badge 
+              className={isPayer ? "bg-[#EC9400] text-white hover:bg-[#EC9400]/90" : "bg-[#026172] text-white hover:bg-[#026172]/90"}
+            >
+              {isPayer ? 'PAYER' : 'USAGE'}
+            </Badge>
           </div>
         </div>
 
@@ -192,25 +197,36 @@ export default function AccountDetailsPage({ params, searchParams }: AccountDeta
             <CardContent className="space-y-4">
               <div>
                 <div className="flex items-center justify-between text-sm mb-2">
-                  <span className="text-muted-foreground">Deposits vs Withdrawals</span>
-                  <span className="font-medium text-primary">{depositPercentage.toFixed(1)}% Deposits</span>
+                  <span className="text-muted-foreground">Cost vs Budget</span>
+                  <span className={`font-medium ${isOverBudget ? 'text-red-600' : 'text-primary'}`}>
+                    {costPercentage.toFixed(1)}% {isOverBudget ? 'Over Budget' : 'Used'}
+                  </span>
                 </div>
-                <Progress value={depositPercentage} className="h-3" />
+                {/* Custom progress bar */}
+                <div className="relative h-3 w-full overflow-hidden rounded-full" style={{ backgroundColor: '#3D97AD' }}>
+                  <div 
+                    className="h-full transition-all"
+                    style={{
+                      width: `${costPercentage}%`,
+                      backgroundColor: isOverBudget ? '#DC2626' : '#EC9400'
+                    }}
+                  />
+                </div>
               </div>
               <div className="grid grid-cols-2 gap-4 pt-2">
                 <div className="space-y-1">
-                  <p className="text-sm text-muted-foreground">Total Deposits</p>
-                  <p className="text-xl font-semibold text-success">
+                  <p className="text-sm text-muted-foreground">Total Budget (Deposits)</p>
+                  <p className="text-xl font-semibold" style={{ color: '#3D97AD' }}>
                     {totalDeposits.toFixed(2)} {transactions[0]?.Currency || 'USD'}
                   </p>
-                  <p className="text-xs text-muted-foreground">{depositPercentage.toFixed(1)}%</p>
+                  <p className="text-xs text-muted-foreground">Available funds</p>
                 </div>
                 <div className="space-y-1">
-                  <p className="text-sm text-muted-foreground">Total Withdrawals</p>
-                  <p className="text-xl font-semibold text-destructive">
+                  <p className="text-sm text-muted-foreground">Total Cost (Withdrawals)</p>
+                  <p className="text-xl font-semibold" style={{ color: isOverBudget ? '#DC2626' : '#EC9400' }}>
                     {totalWithdrawals.toFixed(2)} {transactions[0]?.Currency || 'USD'}
                   </p>
-                  <p className="text-xs text-muted-foreground">{withdrawalPercentage.toFixed(1)}%</p>
+                  <p className="text-xs text-muted-foreground">{costPercentage.toFixed(1)}% of budget</p>
                 </div>
               </div>
             </CardContent>

@@ -7,18 +7,34 @@ import { Button } from "@/components/ui/button"
 import { Loader2, Building2, Users } from "lucide-react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
-import { usePayerAccounts, useUsageAccounts } from "@/hooks/use-api"
+import { usePayerAccounts, useUsageAccounts, useAllTransactions } from "@/hooks/use-api"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { EditPayerAccountModal } from "@/components/edit-payer-account-modal"
 import { EditUsageAccountModal } from "@/components/edit-usage-account-modal"
+import { UnregisteredAccountsSection } from "@/components/unregistered-accounts-section"
+import { findUnregisteredAccounts } from "@/lib/account-utils"
 import type { PayerAccount, UsageAccount } from "@/lib/api"
 
 export default function AccountsPage() {
   const { data: payerAccounts, loading: payerLoading, error: payerError, refetch: refetchPayers } = usePayerAccounts()
   const { data: usageAccounts, loading: usageLoading, error: usageError, refetch: refetchUsage } = useUsageAccounts()
+  const { data: transactions, loading: transactionsLoading, refetch: refetchTransactions } = useAllTransactions()
 
-  const loading = payerLoading || usageLoading
+  const loading = payerLoading || usageLoading || transactionsLoading
   const error = payerError || usageError
+
+  // Find unregistered accounts
+  const unregisteredAccounts = findUnregisteredAccounts(
+    transactions || [],
+    payerAccounts || [],
+    usageAccounts || []
+  )
+
+  const handleAccountRegistered = () => {
+    refetchPayers()
+    refetchUsage()
+    refetchTransactions()
+  }
 
   if (loading) {
     return (
@@ -54,6 +70,16 @@ export default function AccountsPage() {
       <Header title="Accounts" />
 
       <main className="p-6 space-y-8">
+        {/* Unregistered Accounts Section */}
+        {unregisteredAccounts.length > 0 && (
+          <section className="space-y-4">
+            <UnregisteredAccountsSection
+              unregisteredAccounts={unregisteredAccounts}
+              onAccountRegistered={handleAccountRegistered}
+            />
+          </section>
+        )}
+
         {/* Payer Accounts Section */}
         <section>
           <div className="flex items-center gap-2 mb-4">
@@ -128,7 +154,7 @@ function PayerAccountCard({ account, onAccountUpdated }: { account: PayerAccount
               <CardTitle className="text-base">{accountName}</CardTitle>
               <p className="text-sm text-muted-foreground mt-1">ID: {accountId}</p>
             </div>
-            <Badge variant="secondary">PAYER</Badge>
+            <Badge className="bg-[#EC9400] text-white hover:bg-[#EC9400]/90">PAYER</Badge>
           </div>
         </CardHeader>
         <CardContent className="space-y-3">
@@ -174,7 +200,7 @@ function UsageAccountCard({ account, onAccountUpdated }: { account: UsageAccount
   const [editModalOpen, setEditModalOpen] = useState(false)
   const accountId = account.UsageAccountId || account.accountId || account.id
   const customerName = account.CustomerName || account.name
-  const piva = account.PIVA || account.piva
+  const piva = account.PIVA
   const payerId = account.PayerAccountId || account.payerId
   const createdAt = account.CreatedAt || account.createdAt
   const updatedAt = account.UpdatedAt || account.updatedAt
@@ -188,7 +214,7 @@ function UsageAccountCard({ account, onAccountUpdated }: { account: UsageAccount
               <CardTitle className="text-base">{customerName}</CardTitle>
               <p className="text-sm text-muted-foreground mt-1">ID: {accountId}</p>
             </div>
-            <Badge variant="secondary">USAGE</Badge>
+            <Badge className="bg-[#026172] text-white hover:bg-[#026172]/90">USAGE</Badge>
           </div>
         </CardHeader>
         <CardContent className="space-y-3">

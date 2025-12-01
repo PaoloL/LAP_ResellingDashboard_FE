@@ -64,9 +64,7 @@ export default function TransactionsPage() {
     setSelectedAccount("all")
   }
 
-  // Get the first payer and usage account for the register modal
-  const defaultPayer = payers && payers.length > 0 ? (payers[0].PayerAccountId || payers[0].id || "") : ""
-  const defaultUsageAccount = accounts && accounts.length > 0 ? (accounts[0].UsageAccountId || accounts[0].accountId || accounts[0].id || "") : ""
+
 
   if (transactionsLoading || accountsLoading || payersLoading) {
     return (
@@ -192,8 +190,6 @@ export default function TransactionsPage() {
         open={registerModalOpen}
         onOpenChange={setRegisterModalOpen}
         onTransactionCreated={refetchTransactions}
-        payerId={defaultPayer}
-        usageAccountId={defaultUsageAccount}
       />
     </div>
   )

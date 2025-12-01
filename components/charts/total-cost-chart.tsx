@@ -12,7 +12,21 @@ export function TotalCostChart() {
   const monthlyData = useMemo(() => {
     if (!transactions) return []
     
-    const monthlyTotals = transactions.reduce((acc, transaction) => {
+    const currentYear = new Date().getFullYear()
+    
+    // Filter for current year and withdrawals only
+    const currentYearWithdrawals = transactions.filter(transaction => {
+      const dateStr = transaction.TransactionDate || transaction.date
+      if (!dateStr) return false
+      
+      const date = new Date(dateStr)
+      const transactionType = (transaction.TransactionType || transaction.type)?.toUpperCase()
+      
+      return date.getFullYear() === currentYear && transactionType === 'WITHDRAWAL'
+    })
+    
+    // Group by month
+    const monthlyTotals = currentYearWithdrawals.reduce((acc, transaction) => {
       const dateStr = transaction.TransactionDate || transaction.date
       const date = new Date(dateStr)
       const monthKey = date.toLocaleDateString('en-US', { month: 'short' })
@@ -26,9 +40,11 @@ export function TotalCostChart() {
       return acc
     }, {} as Record<string, number>)
     
-    return Object.entries(monthlyTotals).map(([month, cost]) => ({
+    // Create array with all months of current year
+    const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
+    return months.map(month => ({
       month,
-      cost: Math.round(cost * 100) / 100
+      cost: Math.round((monthlyTotals[month] || 0) * 100) / 100
     }))
   }, [transactions])
   

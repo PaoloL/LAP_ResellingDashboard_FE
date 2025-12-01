@@ -19,10 +19,10 @@
   --muted-foreground: oklch(0.45 0.03 235); /* Mid-gray for muted text */
   --accent: oklch(0.65 0.15 75); /* Orange #EC9400 - Accent */
   --accent-foreground: oklch(1 0 0); /* White text on orange */
-  --destructive: oklch(0.5 0.24 27); /* Error Red */
-  --destructive-foreground: oklch(1 0 0);
-  --success: oklch(0.6 0.17 145); /* Success Green */
-  --success-foreground: oklch(1 0 0);
+  --destructive: 236 147 0; /* #EC9400 - Orange for withdrawals */
+  --destructive-foreground: 255 255 255;
+  --success: 61 151 173; /* #3D97AD - Light Teal for deposits */
+  --success-foreground: 255 255 255;
   --border: oklch(0.88 0.01 235); /* Lighter gray for borders */
   --input: oklch(0.98 0 0); /* Near white for input backgrounds */
   --ring: oklch(0.39 0.08 215); /* Medium Teal for focus rings */
@@ -57,10 +57,10 @@
   --muted-foreground: oklch(0.65 0.01 235);
   --accent: oklch(0.7 0.15 75);
   --accent-foreground: oklch(0.12 0.02 235);
-  --destructive: oklch(0.5 0.22 25);
-  --destructive-foreground: oklch(0.95 0.005 235);
-  --success: oklch(0.55 0.15 145);
-  --success-foreground: oklch(0.95 0.005 235);
+  --destructive: 236 147 0; /* #EC9400 - Orange for withdrawals */
+  --destructive-foreground: 255 255 255;
+  --success: 61 151 173; /* #3D97AD - Light Teal for deposits */
+  --success-foreground: 255 255 255;
   --border: oklch(0.25 0.02 235);
   --input: oklch(0.25 0.02 235);
   --ring: oklch(0.45 0.08 215);

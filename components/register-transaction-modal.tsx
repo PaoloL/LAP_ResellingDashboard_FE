@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect, useMemo } from "react"
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -8,6 +8,7 @@ import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Loader2 } from "lucide-react"
 import { transactionsApi } from "@/lib/api"
+import { usePayerAccounts, useUsageAccounts } from "@/hooks/use-api"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 
 interface RegisterTransactionModalProps {
@@ -22,11 +23,16 @@ export function RegisterTransactionModal({
   open,
   onOpenChange,
   onTransactionCreated,
-  payerId = "",
-  usageAccountId = "",
+  payerId: initialPayerId = "",
+  usageAccountId: initialUsageAccountId = "",
 }: RegisterTransactionModalProps) {
   const today = new Date().toISOString().split('T')[0]
   
+  const { data: payerAccounts, loading: payerLoading } = usePayerAccounts()
+  const { data: usageAccounts, loading: usageLoading } = useUsageAccounts()
+  
+  const [payerId, setPayerId] = useState(initialPayerId)
+  const [usageAccountId, setUsageAccountId] = useState(initialUsageAccountId)
   const [transactionType, setTransactionType] = useState<"DEPOSIT" | "WITHDRAWAL">("DEPOSIT")
   const [date, setDate] = useState(today)
   const [amount, setAmount] = useState("")
@@ -36,12 +42,66 @@ export function RegisterTransactionModal({
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
+  // Update state when props change
+  useEffect(() => {
+    setPayerId(initialPayerId)
+    setUsageAccountId(initialUsageAccountId)
+  }, [initialPayerId, initialUsageAccountId])
+
+  // Filter usage accounts by selected payer
+  const filteredUsageAccounts = useMemo(() => {
+    if (!usageAccounts || !payerId) return []
+    return usageAccounts.filter(account => {
+      const accountPayerId = account.PayerAccountId || account.payerId
+      return accountPayerId === payerId
+    })
+  }, [usageAccounts, payerId])
+
+  // Validate that selected usage account belongs to selected payer
+  useEffect(() => {
+    if (usageAccountId && payerId && filteredUsageAccounts.length > 0) {
+      const isValid = filteredUsageAccounts.some(account => {
+        const accountId = account.UsageAccountId || account.accountId || account.id
+        return accountId === usageAccountId
+      })
+      if (!isValid) {
+        setUsageAccountId("") // Clear invalid selection
+      }
+    }
+  }, [payerId, usageAccountId, filteredUsageAccounts])
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setError(null)
     setLoading(true)
 
     try {
+      // Validate payer account
+      if (!payerId) {
+        setError("Please select a payer account")
+        setLoading(false)
+        return
+      }
+
+      // Validate usage account
+      if (!usageAccountId) {
+        setError("Please select a usage account")
+        setLoading(false)
+        return
+      }
+
+      // Validate that usage account belongs to payer
+      const isValid = filteredUsageAccounts.some(account => {
+        const accountId = account.UsageAccountId || account.accountId || account.id
+        return accountId === usageAccountId
+      })
+      
+      if (!isValid) {
+        setError("Selected usage account does not belong to the selected payer account")
+        setLoading(false)
+        return
+      }
+
       // Validate amount
       const amountNum = parseFloat(amount)
       if (isNaN(amountNum) || amountNum <= 0) {
@@ -64,6 +124,8 @@ export function RegisterTransactionModal({
       onOpenChange(false)
       
       // Reset form
+      setPayerId(initialPayerId)
+      setUsageAccountId(initialUsageAccountId)
       setTransactionType("DEPOSIT")
       setDate(today)
       setAmount("")
@@ -90,23 +152,76 @@ export function RegisterTransactionModal({
         <form onSubmit={handleSubmit}>
           <div className="grid gap-4 py-4">
             <div className="grid gap-2">
-              <Label htmlFor="payerId">Payer Account ID</Label>
-              <Input
-                id="payerId"
-                value={payerId}
-                disabled
-                className="bg-muted font-mono"
-              />
+              <Label htmlFor="payerId">
+                Payer Account <span className="text-destructive">*</span>
+              </Label>
+              <Select 
+                value={payerId} 
+                onValueChange={setPayerId}
+                disabled={payerLoading || (initialPayerId !== "" && initialPayerId !== undefined)}
+              >
+                <SelectTrigger className={(initialPayerId && initialPayerId !== "") ? "bg-muted" : ""}>
+                  <SelectValue placeholder="Select payer account" />
+                </SelectTrigger>
+                <SelectContent>
+                  {payerAccounts && payerAccounts.length > 0 ? (
+                    payerAccounts.map((payer) => {
+                      const id = payer.PayerAccountId || payer.id
+                      const name = payer.PayerAccountName || payer.name
+                      return (
+                        <SelectItem key={id} value={id || ""}>
+                          {name} ({id})
+                        </SelectItem>
+                      )
+                    })
+                  ) : (
+                    <SelectItem value="no-payers" disabled>
+                      No payer accounts available
+                    </SelectItem>
+                  )}
+                </SelectContent>
+              </Select>
             </div>
 
             <div className="grid gap-2">
-              <Label htmlFor="usageAccountId">Usage Account ID</Label>
-              <Input
-                id="usageAccountId"
-                value={usageAccountId}
-                disabled
-                className="bg-muted font-mono"
-              />
+              <Label htmlFor="usageAccountId">
+                Usage Account <span className="text-destructive">*</span>
+              </Label>
+              <Select 
+                value={usageAccountId} 
+                onValueChange={setUsageAccountId}
+                disabled={usageLoading || !payerId || (initialUsageAccountId !== "" && initialUsageAccountId !== undefined)}
+              >
+                <SelectTrigger className={(initialUsageAccountId && initialUsageAccountId !== "") ? "bg-muted" : ""}>
+                  <SelectValue placeholder={payerId ? "Select usage account" : "Select payer first"} />
+                </SelectTrigger>
+                <SelectContent>
+                  {filteredUsageAccounts.length > 0 ? (
+                    filteredUsageAccounts.map((usage) => {
+                      const id = usage.UsageAccountId || usage.accountId || usage.id
+                      const name = usage.CustomerName || usage.name
+                      return (
+                        <SelectItem key={id} value={id || ""}>
+                          {name} ({id})
+                        </SelectItem>
+                      )
+                    })
+                  ) : payerId ? (
+                    <SelectItem value="no-usage" disabled>
+                      No usage accounts for this payer
+                    </SelectItem>
+                  ) : (
+                    <SelectItem value="no-payer-selected" disabled>
+                      Select a payer account first
+                    </SelectItem>
+                  )}
+                </SelectContent>
+              </Select>
+              {payerId && filteredUsageAccounts.length === 0 && (
+                <p className="text-xs text-muted-foreground">
+                  No usage accounts found for the selected payer
+                </p>
+              )}
             </div>
 
             <div className="grid gap-2">

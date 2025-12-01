@@ -18,31 +18,47 @@ export function DepositWithdrawalChart() {
   const depositWithdrawalData = useMemo(() => {
     if (!transactions) return []
     
-    const monthlyData = transactions.reduce((acc, transaction) => {
+    const currentYear = new Date().getFullYear()
+    
+    // Filter for current year only
+    const currentYearTransactions = transactions.filter(transaction => {
       const dateStr = transaction.TransactionDate || transaction.date
+      if (!dateStr) return false
+      
+      const date = new Date(dateStr)
+      return date.getFullYear() === currentYear
+    })
+    
+    // Group by month
+    const monthlyData = currentYearTransactions.reduce((acc, transaction) => {
+      const dateStr = transaction.TransactionDate || transaction.date
+      if (!dateStr) return acc
+      
       const date = new Date(dateStr)
       const monthKey = date.toLocaleDateString('en-US', { month: 'short' })
       
       if (!acc[monthKey]) {
-        acc[monthKey] = { month: monthKey, income: 0, expenditure: 0 }
+        acc[monthKey] = { month: monthKey, deposits: 0, withdrawals: 0 }
       }
       
-      const transactionType = (transaction.TransactionType || transaction.type)?.toLowerCase()
+      const transactionType = (transaction.TransactionType || transaction.type)?.toUpperCase()
       const amount = transaction.Amount || transaction.amount || 0
       
-      if (transactionType === 'deposit') {
-        acc[monthKey].income += amount
-      } else {
-        acc[monthKey].expenditure += Math.abs(amount)
+      if (transactionType === 'DEPOSIT') {
+        acc[monthKey].deposits += amount
+      } else if (transactionType === 'WITHDRAWAL') {
+        acc[monthKey].withdrawals += Math.abs(amount)
       }
       
       return acc
-    }, {} as Record<string, { month: string; income: number; expenditure: number }>)
+    }, {} as Record<string, { month: string; deposits: number; withdrawals: number }>)
     
-    return Object.values(monthlyData).map(data => ({
-      ...data,
-      income: Math.round(data.income * 100) / 100,
-      expenditure: Math.round(data.expenditure * 100) / 100
+    // Create array with all months of current year
+    const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
+    return months.map(month => ({
+      month,
+      deposits: Math.round((monthlyData[month]?.deposits || 0) * 100) / 100,
+      withdrawals: Math.round((monthlyData[month]?.withdrawals || 0) * 100) / 100
     }))
   }, [transactions])
   
@@ -65,13 +81,13 @@ export function DepositWithdrawalChart() {
   return (
     <ChartContainer
       config={{
-        income: {
-          label: "Income",
-          color: "hsl(var(--success))",
+        deposits: {
+          label: "Deposits",
+          color: "#3D97AD",
         },
-        expenditure: {
-          label: "Expenditure",
-          color: "hsl(var(--destructive))",
+        withdrawals: {
+          label: "Withdrawals",
+          color: "#EC9400",
         },
       }}
       className="h-[250px] w-full"
@@ -82,9 +98,9 @@ export function DepositWithdrawalChart() {
           <XAxis dataKey="month" tickLine={false} axisLine={false} tickMargin={8} style={{ fontSize: "12px" }} />
           <YAxis tickLine={false} axisLine={false} tickMargin={8} style={{ fontSize: "12px" }} />
           <ChartTooltip content={<ChartTooltipContent />} />
-          <ChartLegend content={<ChartLegendContent />} />
-          <Line type="monotone" dataKey="income" stroke="var(--color-income)" strokeWidth={2} dot={false} />
-          <Line type="monotone" dataKey="expenditure" stroke="var(--color-expenditure)" strokeWidth={2} dot={false} />
+          <ChartLegend content={<ChartLegendContent payload={[]} />} />
+          <Line type="monotone" dataKey="deposits" stroke="var(--color-deposits)" strokeWidth={2} dot={false} />
+          <Line type="monotone" dataKey="withdrawals" stroke="var(--color-withdrawals)" strokeWidth={2} dot={false} />
         </LineChart>
       </ResponsiveContainer>
     </ChartContainer>
