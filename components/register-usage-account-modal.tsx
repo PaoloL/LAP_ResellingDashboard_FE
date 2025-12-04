@@ -16,6 +16,7 @@ interface RegisterUsageAccountModalProps {
   onOpenChange: (open: boolean) => void
   onAccountCreated: () => void
   prefilledAccountId?: string
+  prefilledAccountName?: string
 }
 
 export function RegisterUsageAccountModal({
@@ -30,7 +31,7 @@ export function RegisterUsageAccountModal({
   
   const [formData, setFormData] = useState({
     UsageAccountId: prefilledAccountId || "",
-    CustomerName: "",
+    CustomerName: prefilledAccountId || "",
     PIVA: "",
     PayerAccountId: "",
   })
@@ -38,7 +39,11 @@ export function RegisterUsageAccountModal({
   // Update form when prefilledAccountId changes
   useState(() => {
     if (prefilledAccountId) {
-      setFormData(prev => ({ ...prev, UsageAccountId: prefilledAccountId }))
+      setFormData(prev => ({ 
+        ...prev, 
+        UsageAccountId: prefilledAccountId,
+        CustomerName: prefilledAccountId 
+      }))
     }
   })
 
@@ -110,7 +115,7 @@ export function RegisterUsageAccountModal({
 
             <div className="space-y-2">
               <Label htmlFor="customerName">
-                Customer Name <span className="text-red-500">*</span>
+                Usage Account Name <span className="text-red-500">*</span>
               </Label>
               <Input
                 id="customerName"
@@ -124,16 +129,18 @@ export function RegisterUsageAccountModal({
 
             <div className="space-y-2">
               <Label htmlFor="piva">
-                VAT Number (PIVA) <span className="text-red-500">*</span>
+                VAT Number (PIVA)
               </Label>
               <Input
                 id="piva"
                 placeholder="e.g., IT12345678901"
                 value={formData.PIVA}
                 onChange={(e) => handleChange("PIVA", e.target.value)}
-                required
                 disabled={loading}
               />
+              <p className="text-xs text-muted-foreground">
+                Optional
+              </p>
             </div>
 
             <div className="space-y-2">

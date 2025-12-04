@@ -26,13 +26,17 @@ export function RegisterPayerAccountModal({
   const [error, setError] = useState<string | null>(null)
   const [formData, setFormData] = useState({
     PayerAccountId: prefilledAccountId || "",
-    PayerAccountName: "",
+    PayerAccountName: prefilledAccountId || "",
   })
 
   // Update form when prefilledAccountId changes
   useState(() => {
     if (prefilledAccountId) {
-      setFormData(prev => ({ ...prev, PayerAccountId: prefilledAccountId }))
+      setFormData(prev => ({ 
+        ...prev, 
+        PayerAccountId: prefilledAccountId,
+        PayerAccountName: prefilledAccountId 
+      }))
     }
   })
 

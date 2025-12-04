@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useMemo } from "react"
 import { Header } from "@/components/header"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
@@ -22,6 +22,10 @@ export default function TransactionsPage() {
   const [selectedAccount, setSelectedAccount] = useState("all")
   const [selectedPayer, setSelectedPayer] = useState("all")
   const [registerModalOpen, setRegisterModalOpen] = useState(false)
+  
+  // Pagination state
+  const [currentPage, setCurrentPage] = useState(1)
+  const itemsPerPage = 10
   
   const { data: transactions, loading: transactionsLoading, error: transactionsError, refetch: refetchTransactions } = useAllTransactions()
   const { data: accounts, loading: accountsLoading } = useUsageAccounts()
@@ -53,18 +57,31 @@ export default function TransactionsPage() {
     const accountMatch = selectedAccount === "all" || 
                         transaction.UsageAccountId === selectedAccount || 
                         transaction.accountId === selectedAccount
+    const payerMatch = selectedPayer === "all" ||
+                      transaction.PayerAccountId === selectedPayer ||
+                      transaction.payerId === selectedPayer
     
-    return dateMatch && accountMatch
+    return dateMatch && accountMatch && payerMatch
   }) || []
 
-  const clearFilters = () => {
-    const currentMonth = getCurrentMonthDateRange()
-    setDateFrom(currentMonth.startDate)
-    setDateTo(currentMonth.endDate)
-    setSelectedAccount("all")
-  }
+  // Reset to page 1 when filters change
+  useEffect(() => {
+    setCurrentPage(1)
+  }, [dateFrom, dateTo, selectedAccount, selectedPayer])
 
-
+  // Pagination calculations
+  const { paginatedTransactions, totalPages } = useMemo(() => {
+    if (!filteredTransactions || filteredTransactions.length === 0) {
+      return { paginatedTransactions: [], totalPages: 0 }
+    }
+    
+    const total = Math.ceil(filteredTransactions.length / itemsPerPage)
+    const startIndex = (currentPage - 1) * itemsPerPage
+    const endIndex = startIndex + itemsPerPage
+    const paginated = filteredTransactions.slice(startIndex, endIndex)
+    
+    return { paginatedTransactions: paginated, totalPages: total }
+  }, [filteredTransactions, currentPage, itemsPerPage])
 
   if (transactionsLoading || accountsLoading || payersLoading) {
     return (
@@ -137,6 +154,26 @@ export default function TransactionsPage() {
                   onChange={(e) => setDateTo(e.target.value)}
                 />
               </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="payer">Payer Account</Label>
+                <Select value={selectedPayer} onValueChange={setSelectedPayer}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="All payers" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All payers</SelectItem>
+                    {payers?.map((payer) => (
+                      <SelectItem 
+                        key={payer.PayerAccountId || payer.id} 
+                        value={payer.PayerAccountId || payer.id || ""}
+                      >
+                        {payer.PayerAccountName || payer.name} ({payer.PayerAccountId || payer.id})
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
               
               <div className="space-y-2">
                 <Label htmlFor="account">Usage Account</Label>
@@ -157,12 +194,6 @@ export default function TransactionsPage() {
                   </SelectContent>
                 </Select>
               </div>
-              
-              <div className="flex items-end">
-                <Button variant="outline" onClick={clearFilters}>
-                  Clear Filters
-                </Button>
-              </div>
             </div>
           </CardContent>
         </Card>
@@ -176,7 +207,58 @@ export default function TransactionsPage() {
           </CardHeader>
           <CardContent>
             {filteredTransactions.length > 0 ? (
-              <TransactionList transactions={filteredTransactions} />
+              <>
+                <div className="flex items-center justify-between mb-4">
+                  <p className="text-sm text-muted-foreground">
+                    Showing {((currentPage - 1) * itemsPerPage) + 1}-{Math.min(currentPage * itemsPerPage, filteredTransactions.length)} of {filteredTransactions.length} transaction{filteredTransactions.length !== 1 ? 's' : ''}
+                  </p>
+                  <div className="flex items-center gap-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+                      disabled={currentPage === 1}
+                    >
+                      Previous
+                    </Button>
+                    <span className="text-sm text-muted-foreground">
+                      Page {currentPage} of {totalPages}
+                    </span>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+                      disabled={currentPage === totalPages}
+                    >
+                      Next
+                    </Button>
+                  </div>
+                </div>
+                <TransactionList transactions={paginatedTransactions} />
+                {totalPages > 1 && (
+                  <div className="flex items-center justify-center gap-2 mt-4 pt-4 border-t">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+                      disabled={currentPage === 1}
+                    >
+                      Previous
+                    </Button>
+                    <span className="text-sm text-muted-foreground">
+                      Page {currentPage} of {totalPages}
+                    </span>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+                      disabled={currentPage === totalPages}
+                    >
+                      Next
+                    </Button>
+                  </div>
+                )}
+              </>
             ) : (
               <p className="text-center text-muted-foreground py-8">
                 No transactions found matching the selected filters

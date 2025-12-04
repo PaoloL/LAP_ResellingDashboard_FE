@@ -9,6 +9,7 @@ export interface PayerAccount {
   // New backend format
   PayerAccountId?: string
   PayerAccountName?: string
+  YearlyBudget?: number
   CreatedAt?: string
   UpdatedAt?: string
   
@@ -17,6 +18,7 @@ export interface PayerAccount {
   name?: string
   customerName?: string
   piva?: string
+  yearlyBudget?: number
   status?: 'active' | 'inactive'
   createdAt?: string
   updatedAt?: string
@@ -28,6 +30,7 @@ export interface UsageAccount {
   CustomerName?: string
   PIVA?: string
   PayerAccountId?: string
+  YearlyBudget?: number
   CreatedAt?: string
   UpdatedAt?: string
   
@@ -36,6 +39,7 @@ export interface UsageAccount {
   accountId?: string
   payerId?: string
   name?: string
+  yearlyBudget?: number
   status?: 'active' | 'inactive'
   totalCost?: number
   depositPercentage?: number

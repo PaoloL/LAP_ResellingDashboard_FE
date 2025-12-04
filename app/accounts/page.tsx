@@ -4,18 +4,22 @@ import { useState } from "react"
 import Link from "next/link"
 import { Header } from "@/components/header"
 import { Button } from "@/components/ui/button"
-import { Loader2, Building2, Users } from "lucide-react"
+import { Loader2, Building2, Users, Filter } from "lucide-react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { Label } from "@/components/ui/label"
 import { usePayerAccounts, useUsageAccounts, useAllTransactions } from "@/hooks/use-api"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { EditPayerAccountModal } from "@/components/edit-payer-account-modal"
 import { EditUsageAccountModal } from "@/components/edit-usage-account-modal"
 import { UnregisteredAccountsSection } from "@/components/unregistered-accounts-section"
-import { findUnregisteredAccounts } from "@/lib/account-utils"
-import type { PayerAccount, UsageAccount } from "@/lib/api"
+import { findUnregisteredAccounts, getAccountMetrics, formatCurrency } from "@/lib/account-utils"
+import type { PayerAccount, UsageAccount, Transaction } from "@/lib/api"
 
 export default function AccountsPage() {
+  const [selectedPayerFilter, setSelectedPayerFilter] = useState<string>("all")
+  
   const { data: payerAccounts, loading: payerLoading, error: payerError, refetch: refetchPayers } = usePayerAccounts()
   const { data: usageAccounts, loading: usageLoading, error: usageError, refetch: refetchUsage } = useUsageAccounts()
   const { data: transactions, loading: transactionsLoading, refetch: refetchTransactions } = useAllTransactions()
@@ -29,6 +33,12 @@ export default function AccountsPage() {
     payerAccounts || [],
     usageAccounts || []
   )
+
+  // Filter usage accounts by selected payer
+  const filteredUsageAccounts = usageAccounts?.filter(account => {
+    if (selectedPayerFilter === "all") return true
+    return (account.PayerAccountId || account.payerId) === selectedPayerFilter
+  }) || []
 
   const handleAccountRegistered = () => {
     refetchPayers()
@@ -93,6 +103,7 @@ export default function AccountsPage() {
                 <PayerAccountCard 
                   key={account.PayerAccountId || account.id} 
                   account={account}
+                  transactions={transactions || []}
                   onAccountUpdated={refetchPayers}
                 />
               ))}
@@ -109,17 +120,42 @@ export default function AccountsPage() {
 
         {/* Usage Accounts Section */}
         <section>
-          <div className="flex items-center gap-2 mb-4">
-            <Users className="h-5 w-5 text-primary" />
-            <h2 className="text-xl font-semibold">Usage Accounts</h2>
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center gap-2">
+              <Users className="h-5 w-5 text-primary" />
+              <h2 className="text-xl font-semibold">Usage Accounts</h2>
+            </div>
+            
+            {/* Payer Filter */}
+            <div className="flex items-center gap-2">
+              <Filter className="h-4 w-4 text-muted-foreground" />
+              <Label htmlFor="payerFilter" className="text-sm">Filter by Payer:</Label>
+              <Select value={selectedPayerFilter} onValueChange={setSelectedPayerFilter}>
+                <SelectTrigger className="w-[250px]">
+                  <SelectValue placeholder="All payers" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All payers</SelectItem>
+                  {payerAccounts?.map((payer) => (
+                    <SelectItem 
+                      key={payer.PayerAccountId || payer.id} 
+                      value={payer.PayerAccountId || payer.id || ""}
+                    >
+                      {payer.PayerAccountName || payer.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
           </div>
 
-          {usageAccounts && usageAccounts.length > 0 ? (
+          {filteredUsageAccounts && filteredUsageAccounts.length > 0 ? (
             <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-              {usageAccounts.map((account) => (
+              {filteredUsageAccounts.map((account) => (
                 <UsageAccountCard 
                   key={account.UsageAccountId || account.id} 
                   account={account}
+                  transactions={transactions || []}
                   onAccountUpdated={refetchUsage}
                 />
               ))}
@@ -138,12 +174,23 @@ export default function AccountsPage() {
   )
 }
 
-function PayerAccountCard({ account, onAccountUpdated }: { account: PayerAccount; onAccountUpdated: () => void }) {
+function PayerAccountCard({ 
+  account, 
+  transactions, 
+  onAccountUpdated 
+}: { 
+  account: PayerAccount
+  transactions: Transaction[]
+  onAccountUpdated: () => void 
+}) {
   const [editModalOpen, setEditModalOpen] = useState(false)
   const accountId = account.PayerAccountId || account.id
   const accountName = account.PayerAccountName || account.name
   const createdAt = account.CreatedAt || account.createdAt
   const updatedAt = account.UpdatedAt || account.updatedAt
+
+  // Calculate metrics (budget is calculated from DEPOSIT transactions)
+  const metrics = accountId ? getAccountMetrics(transactions, accountId, 'payer') : null
 
   return (
     <>
@@ -158,6 +205,34 @@ function PayerAccountCard({ account, onAccountUpdated }: { account: PayerAccount
           </div>
         </CardHeader>
         <CardContent className="space-y-3">
+          {/* Cost Metrics */}
+          {metrics && (
+            <div className="space-y-2 pb-3 border-b">
+              <div className="flex justify-between items-center">
+                <p className="text-xs text-muted-foreground">Total Cost (YTD)</p>
+                <p className="text-sm font-semibold">{formatCurrency(metrics.totalCostYTD)}</p>
+              </div>
+              <div className="flex justify-between items-center">
+                <p className="text-xs text-muted-foreground">Total Cost (MTD)</p>
+                <p className="text-sm font-semibold">{formatCurrency(metrics.totalCostMTD)}</p>
+              </div>
+              <div className="flex justify-between items-center">
+                <p className="text-xs text-muted-foreground">Budget</p>
+                {metrics.costVsBudgetPercentage !== null ? (
+                  <p className={`text-sm font-semibold ${
+                    metrics.costVsBudgetPercentage > 100 ? 'text-red-600' : 
+                    metrics.costVsBudgetPercentage > 80 ? 'text-yellow-600' : 
+                    'text-green-600'
+                  }`}>
+                    {metrics.costVsBudgetPercentage.toFixed(1)}% Used
+                  </p>
+                ) : (
+                  <p className="text-sm text-muted-foreground">No budget</p>
+                )}
+              </div>
+            </div>
+          )}
+
           <div className="space-y-1">
             <p className="text-xs text-muted-foreground">Created</p>
             <p className="text-sm">{createdAt ? new Date(createdAt).toLocaleDateString() : 'N/A'}</p>
@@ -196,7 +271,15 @@ function PayerAccountCard({ account, onAccountUpdated }: { account: PayerAccount
   )
 }
 
-function UsageAccountCard({ account, onAccountUpdated }: { account: UsageAccount; onAccountUpdated: () => void }) {
+function UsageAccountCard({ 
+  account, 
+  transactions, 
+  onAccountUpdated 
+}: { 
+  account: UsageAccount
+  transactions: Transaction[]
+  onAccountUpdated: () => void 
+}) {
   const [editModalOpen, setEditModalOpen] = useState(false)
   const accountId = account.UsageAccountId || account.accountId || account.id
   const customerName = account.CustomerName || account.name
@@ -204,6 +287,9 @@ function UsageAccountCard({ account, onAccountUpdated }: { account: UsageAccount
   const payerId = account.PayerAccountId || account.payerId
   const createdAt = account.CreatedAt || account.createdAt
   const updatedAt = account.UpdatedAt || account.updatedAt
+
+  // Calculate metrics (budget is calculated from DEPOSIT transactions)
+  const metrics = accountId ? getAccountMetrics(transactions, accountId, 'usage') : null
 
   return (
     <>
@@ -218,6 +304,34 @@ function UsageAccountCard({ account, onAccountUpdated }: { account: UsageAccount
           </div>
         </CardHeader>
         <CardContent className="space-y-3">
+          {/* Cost Metrics */}
+          {metrics && (
+            <div className="space-y-2 pb-3 border-b">
+              <div className="flex justify-between items-center">
+                <p className="text-xs text-muted-foreground">Total Cost (YTD)</p>
+                <p className="text-sm font-semibold">{formatCurrency(metrics.totalCostYTD)}</p>
+              </div>
+              <div className="flex justify-between items-center">
+                <p className="text-xs text-muted-foreground">Total Cost (MTD)</p>
+                <p className="text-sm font-semibold">{formatCurrency(metrics.totalCostMTD)}</p>
+              </div>
+              <div className="flex justify-between items-center">
+                <p className="text-xs text-muted-foreground">Budget</p>
+                {metrics.costVsBudgetPercentage !== null ? (
+                  <p className={`text-sm font-semibold ${
+                    metrics.costVsBudgetPercentage > 100 ? 'text-red-600' : 
+                    metrics.costVsBudgetPercentage > 80 ? 'text-yellow-600' : 
+                    'text-green-600'
+                  }`}>
+                    {metrics.costVsBudgetPercentage.toFixed(1)}% Used
+                  </p>
+                ) : (
+                  <p className="text-sm text-muted-foreground">No budget</p>
+                )}
+              </div>
+            </div>
+          )}
+
           {piva && (
             <div className="space-y-1">
               <p className="text-xs text-muted-foreground">VAT Number</p>
