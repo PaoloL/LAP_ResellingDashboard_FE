@@ -3,17 +3,15 @@ import type { Metadata } from "next"
 import { Geist, Geist_Mono } from "next/font/google"
 import { Analytics } from "@vercel/analytics/next"
 import "./globals.css"
-// <CHANGE> Added SidebarNav for dashboard navigation
-import { SidebarNav } from "@/components/sidebar-nav"
 import { Toaster } from "@/components/ui/toaster"
 import { ConfigProvider } from "@/components/config-provider"
-import { ConfigStatus } from "@/components/config-status"
+import { AuthProvider } from "@/contexts/auth-context"
+import { LayoutWrapper } from "@/components/layout-wrapper"
 
 const _geist = Geist({ subsets: ["latin"] })
 const _geistMono = Geist_Mono({ subsets: ["latin"] })
 
 export const metadata: Metadata = {
-  // <CHANGE> Updated metadata for AWS Billing Dashboard
   title: "AWS Billing Dashboard",
   description: "Track spending across AWS accounts",
   generator: "v0.app",
@@ -44,13 +42,14 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body className={`font-sans antialiased`}>
-        <ConfigProvider>
-          {/* <CHANGE> Added sidebar navigation and adjusted layout for dashboard */}
-          <SidebarNav />
-          <div className="ml-64">{children}</div>
-          <ConfigStatus />
-          <Toaster />
-        </ConfigProvider>
+        <AuthProvider>
+          <ConfigProvider>
+            <LayoutWrapper>
+              {children}
+            </LayoutWrapper>
+            <Toaster />
+          </ConfigProvider>
+        </AuthProvider>
         <Analytics />
       </body>
     </html>

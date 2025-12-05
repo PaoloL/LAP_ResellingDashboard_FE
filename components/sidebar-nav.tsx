@@ -5,11 +5,12 @@ import { usePathname } from "next/navigation"
 import { Home, CreditCard, Settings, Receipt } from "lucide-react"
 import { cn } from "@/lib/utils"
 import Image from "next/image"
+import { UserMenu } from "./user-menu"
 
 const navItems = [
   {
     title: "Home",
-    href: "/",
+    href: "/dashboard",
     icon: Home,
   },
   {
@@ -70,6 +71,11 @@ export function SidebarNav() {
             )
           })}
         </nav>
+
+        {/* User Menu at Bottom */}
+        <div className="border-t border-sidebar-border p-4">
+          <UserMenu />
+        </div>
       </div>
     </aside>
   )

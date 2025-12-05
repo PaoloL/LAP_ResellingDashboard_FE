@@ -465,6 +465,123 @@ Documented deployment process and status.
 
 ---
 
+## Authentication & Security
+
+### Custom Authentication UI
+**Date**: December 2025
+
+Implemented custom authentication modals instead of Cognito Hosted UI.
+
+**Components:**
+- **Auth Modal** (`components/auth-modal.tsx`) - Custom sign-in/registration modal
+- **Cognito Auth Library** (`lib/cognito-auth.ts`) - Direct Cognito API integration
+- **Auth Context** (`contexts/auth-context.tsx`) - Global authentication state
+- **Auth Config** (`lib/auth-config.ts`) - Cognito configuration
+
+**Features:**
+- Custom sign-in and registration forms in modal dialog
+- Email verification with 6-digit code
+- Password visibility toggle
+- Real-time form validation
+- Error handling with user-friendly messages
+- Loading states during API calls
+- Seamless mode switching (sign-in ↔ registration)
+
+**Authentication Flows:**
+
+**Registration:**
+1. User clicks "Register" → Modal opens
+2. Enter name, email, password → Submit
+3. Account created → Verification email sent
+4. Enter 6-digit code → Email verified
+5. Can now sign in
+
+**Sign-In:**
+1. User clicks "Sign In" → Modal opens
+2. Enter email and password → Submit
+3. Tokens received (ID, Access, Refresh)
+4. Tokens stored in localStorage
+5. Redirect to dashboard
+
+**Session Management:**
+- ID Token: 1 hour expiration
+- Refresh Token: 30 days validity
+- Automatic token refresh when expired
+- Session persists across page refreshes
+- Sign-out clears all tokens
+
+**Security:**
+- Password requirements enforced by Cognito
+- Email verification required before sign-in
+- Tokens stored in localStorage (acceptable for SPAs)
+- HTTPS required in production
+- No client secret (public SPA)
+
+**Benefits over Hosted UI:**
+- Consistent branding with application
+- No redirect, stays on same page
+- Full control over form fields and validation
+- Better mobile experience
+- Custom error messages
+- Seamless integration
+
+---
+
+### API Authorization
+**Date**: December 2025
+
+Implemented automatic authorization header injection for all API requests.
+
+**Features:**
+- Retrieves ID token from localStorage
+- Adds Bearer token to Authorization header
+- Handles 401 errors by clearing tokens and redirecting
+- Automatic token refresh on expiration
+
+**Implementation:**
+```typescript
+// Get token from localStorage
+const authToken = getAuthToken()
+
+// Add to request headers
+headers['Authorization'] = `Bearer ${authToken}`
+
+// Handle 401 errors
+if (response.status === 401) {
+  localStorage.removeItem('auth_tokens')
+  window.location.href = '/'
+}
+```
+
+**API Client Updates:**
+- Centralized token management
+- Automatic header injection
+- Error handling with redirect
+- Token expiration handling
+
+---
+
+### Protected Routes
+**Date**: December 2025
+
+Implemented route protection based on authentication state.
+
+**Features:**
+- Public pages: `/` (home), `/auth/callback`
+- Protected pages: `/dashboard`, `/accounts`, `/transactions`, `/settings`
+- Automatic redirect to home if not authenticated
+- Loading states during auth check
+- Conditional layout rendering
+
+**Layout Wrapper:**
+- Checks authentication state
+- Renders public layout for public pages
+- Renders authenticated layout (sidebar + content) for protected pages
+- Shows loading spinner during auth verification
+- Redirects unauthenticated users to home
+
+---
+
 ## Accessibility
 
 ### WCAG Compliance

@@ -4,6 +4,22 @@ import { awsConfig } from './aws-config'
 
 const API_BASE_URL = awsConfig.apiGateway.fullUrl
 
+// Get authorization token from localStorage
+function getAuthToken(): string | null {
+  if (typeof window === 'undefined') return null
+  
+  try {
+    const tokensStr = localStorage.getItem('auth_tokens')
+    if (!tokensStr) return null
+    
+    const tokens = JSON.parse(tokensStr)
+    return tokens.idToken || null
+  } catch (error) {
+    console.error('Failed to get auth token:', error)
+    return null
+  }
+}
+
 // Types
 export interface PayerAccount {
   // New backend format
@@ -87,15 +103,35 @@ class ApiError extends Error {
 async function apiRequest<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
   const url = `${API_BASE_URL}${endpoint}`
   
+  const authToken = getAuthToken()
+  
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/json',
+    ...options.headers as Record<string, string>,
+  }
+  
+  // Add authorization header if token is available
+  if (authToken) {
+    headers['Authorization'] = `Bearer ${authToken}`
+  }
+  
   const response = await fetch(url, {
-    headers: {
-      'Content-Type': 'application/json',
-      ...options.headers,
-    },
     ...options,
+    headers,
   })
 
   if (!response.ok) {
+    // Handle authentication errors
+    if (response.status === 401) {
+      // Token expired or invalid, redirect to login
+      if (typeof window !== 'undefined') {
+        localStorage.removeItem('auth_tokens')
+        localStorage.removeItem('auth_token_expiry')
+        window.location.href = '/'
+      }
+      throw new ApiError(401, 'Authentication required')
+    }
+    
     const errorText = await response.text()
     throw new ApiError(response.status, `API Error: ${response.statusText} - ${errorText}`)
   }
